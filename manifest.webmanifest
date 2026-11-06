@@ -1,0 +1,13 @@
+{
+  "name": "Wuppitall – Deine Entdeckerkarte",
+  "short_name": "Wuppitall",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101522",
+  "theme_color": "#101522",
+  "description": "Entdecke Städte und Straßenabschnitte mit deinen Freunden.",
+  "icons": [
+    {"src":"./logo.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}
+  ]
+}

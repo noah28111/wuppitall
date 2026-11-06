@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101522">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Wuppitall">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./logo.svg">
+<link rel="icon" href="./logo.svg">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<title>Wuppitall</title>
+<style>
+:root{--bg:#101522;--panel:#1a2233;--panel2:#222d42;--text:#f4f6fb;--muted:#aab4c7;--pink:#ff62bd;--line:#344057;--green:#54d6a0}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+button,input,select{font:inherit}button{border:0;border-radius:12px;padding:11px 14px;background:#34435e;color:white;font-weight:650;cursor:pointer}button.primary{background:var(--pink);color:#21101c}button.ghost{background:transparent;border:1px solid var(--line)}button.danger{background:#743c50}button:disabled{opacity:.45}
+header{padding:calc(14px + env(safe-area-inset-top)) 16px 14px;background:#151d2c;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:500}
+.logo{width:42px;height:42px;border-radius:13px}h1{font-size:21px;margin:0}header small{color:var(--muted)}
+main{max-width:1000px;margin:auto;padding:15px 14px 40px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:15px;margin-bottom:14px}
+h2{font-size:18px;margin:0 0 12px}h3{font-size:15px;margin:0 0 8px}.muted{color:var(--muted)}.small{font-size:12px;color:var(--muted)}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.row>*{min-width:0}.grow{flex:1}
+input,select{background:#111a29;border:1px solid var(--line);color:var(--text);padding:11px;border-radius:11px;min-width:0;width:100%}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 5px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stat{background:var(--panel2);border-radius:13px;padding:12px}.stat strong{display:block;font-size:22px}.stat span{font-size:12px;color:var(--muted)}
+#map{height:54vh;min-height:330px;border-radius:15px;overflow:hidden;background:#dce4e9}.mapwrap{position:relative}
+.person{display:flex;align-items:center;gap:10px;background:var(--panel2);padding:10px;border-radius:13px;margin:8px 0}
+.avatar{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:27px;background:#34435e;flex:none}
+.person .meta{flex:1;min-width:0}.person .meta strong{display:block}.person .meta small{color:var(--muted)}
+.colorDot{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:5px}
+.tabs{display:flex;gap:7px;overflow:auto;margin-bottom:13px}.tabs button{white-space:nowrap;padding:9px 12px}.tabs button.active{background:var(--pink);color:#21101c}
+.hidden{display:none!important}.tripbar{display:flex;gap:8px;flex-wrap:wrap}.tripbar button{flex:1}
+.listitem{padding:10px 0;border-bottom:1px solid var(--line)}.listitem:last-child{border:0}
+.progress{height:9px;background:#344057;border-radius:9px;overflow:hidden;margin-top:8px}.progress>i{display:block;height:100%;background:var(--pink)}
+footer{text-align:center;color:var(--muted);font-size:11px;padding:20px}
+#toast{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:#29364e;padding:12px 16px;border-radius:12px;z-index:1000;display:none;max-width:90%;box-shadow:0 6px 25px #0008}
+@media(min-width:760px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}#map{height:600px}}
+</style>
+</head>
+<body>
+<header><img class="logo" src="./logo.svg" alt=""><div><h1>Wuppitall</h1><small>Entdecke Straße für Straße</small></div><div class="grow"></div><button class="ghost" id="homeBtn">Städte</button></header>
+<main>
+<section id="cityScreen">
+ <div class="panel">
+  <h2>Deine Entdeckerkarte</h2>
+  <p class="muted">Wähle eine Stadt aus oder füge eine neue hinzu. Jede Stadt hat ihren eigenen Fortschritt.</p>
+  <label for="citySearch">Stadt suchen</label>
+  <div class="row"><input id="citySearch" placeholder="z. B. Wuppertal"><button class="primary" id="searchCity">Suchen</button></div>
+  <div id="cityResults" class="small" style="margin-top:10px"></div>
+ </div>
+ <div class="panel"><h2>Gespeicherte Städte</h2><div id="cityList"></div></div>
+ <div class="panel"><h2>Spielstand</h2><div class="row"><button id="exportBtn">Exportieren</button><button id="importBtn">Importieren</button><input type="file" id="importFile" accept="application/json" class="hidden"></div><p class="small">Exportiere regelmäßig eine Sicherung. Die Daten liegen zunächst nur auf diesem Gerät.</p></div>
+</section>
+
+<section id="appScreen" class="hidden">
+ <div class="row" style="margin-bottom:12px"><div class="grow"><h2 id="cityTitle">Stadt</h2><div class="small" id="citySubtitle">Dein Fortschritt</div></div><button class="ghost" id="changeCity">Stadt wechseln</button></div>
+ <div class="grid" style="margin-bottom:14px">
+  <div class="stat"><strong id="statPercent">0%</strong><span>Entdeckt</span></div>
+  <div class="stat"><strong id="statRoads">0 / 0</strong><span>Straßenabschnitte</span></div>
+  <div class="stat"><strong id="statKm">0 km</strong><span>Tour-Kilometer</span></div>
+  <div class="stat"><strong id="statTrips">0</strong><span>Touren</span></div>
+ </div>
+ <div class="tabs">
+  <button class="active" data-tab="mapTab">Karte</button><button data-tab="peopleTab">Personen</button><button data-tab="statsTab">Rangliste</button><button data-tab="historyTab">Touren</button><button data-tab="settingsTab">Daten</button>
+ </div>
+ <section id="mapTab">
+  <div class="panel">
+   <div class="row"><div class="grow"><label for="tripPerson">Wer ist heute dabei?</label><select id="tripPerson"></select></div><button id="startTrip" class="primary" style="align-self:end">Tour starten</button><button id="stopTrip" class="danger hidden" style="align-self:end">Beenden</button></div>
+   <p class="small" id="tripStatus">GPS wird nur während einer gestarteten Tour verwendet. Wenn du die App verlässt, wird die Tour gestoppt.</p>
+   <div class="row"><button class="ghost" id="locateBtn">Mein Standort</button><button class="ghost" id="reloadRoads">Straßen neu laden</button></div>
+  </div>
+  <div class="mapwrap"><div id="map"></div></div>
+  <div class="panel" style="margin-top:14px"><h3>Straße suchen</h3><div class="row"><input id="roadSearch" placeholder="Straßenname"><button id="findRoad">Suchen</button></div><div id="roadResults"></div><p class="small">Tipp: Während einer Tour kannst du Straßenabschnitte auch direkt auf der Karte antippen.</p></div>
+ </section>
+
+ <section id="peopleTab" class="hidden">
+  <div class="panel"><h2>Charaktere & Personen</h2><p class="small">Lege für jede mitfahrende Person einen eigenen Charakter und eine Farbe fest.</p><div id="peopleList"></div>
+   <h3 style="margin-top:18px">Neue Person erstellen</h3>
+   <label>Name</label><input id="newPersonName" placeholder="z. B. Julian">
+   <label>Charakter auswählen</label><select id="newPersonAvatar"><option value="🧭">🧭 Entdecker</option><option value="🧑‍🚒">🧑‍🚒 Feuerwehr</option><option value="🧑‍✈️">🧑‍✈️ Pilot</option><option value="🧗">🧗 Abenteurer</option><option value="🚴">🚴 Radfahrer</option><option value="🧑‍🚀">🧑‍🚀 Astronaut</option><option value="🕵️">🕵️ Detektiv</option><option value="🏕️">🏕️ Camper</option><option value="🐼">🐼 Panda</option><option value="🦊">🦊 Fuchs</option><option value="🐸">🐸 Frosch</option><option value="⭐">⭐ Stern</option></select>
+   <label>Farbe für entdeckte Straßen</label><input type="color" id="newPersonColor" value="#ff62bd">
+   <div style="margin-top:12px"><button class="primary" id="addPerson">Person hinzufügen</button></div>
+  </div>
+ </section>
+
+ <section id="statsTab" class="hidden"><div class="panel"><h2>Rangliste</h2><div id="ranking"></div></div></section>
+ <section id="historyTab" class="hidden"><div class="panel"><h2>Tourenübersicht</h2><div id="history"></div></div></section>
+ <section id="settingsTab" class="hidden">
+  <div class="panel"><h2>Daten verwalten</h2><p class="muted">Sichere deine Entdeckungen als JSON-Datei oder stelle einen früheren Spielstand wieder her.</p><div class="row"><button id="exportBtn2">Spielstand exportieren</button><button id="importBtn2">Spielstand importieren</button></div><p class="small">Die App benötigt eine Internetverbindung, um Stadtgrenzen, Straßendaten und Kartenkacheln abzurufen.</p></div>
+ </section>
+</section>
+</main>
+<footer>Wuppitall · Deine Stadt. Deine Straßen. Deine Entdeckung.</footer>
+<div id="toast"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+const STORE="wuppitall-v4";
+const $=id=>document.getElementById(id);
+const defaultDB={people:[{id:"p_noah",name:"Noah",avatar:"🧭",color:"#ff62bd"},{id:"p_julian",name:"Julian",avatar:"🧑‍🚒",color:"#55a7ff"},{id:"p_max",name:"Max",avatar:"🧑‍✈️",color:"#35d996"}],cities:{},currentCity:null};
+let db=loadDB(),city=null,map=null,roadLayer=null,maskLayer=null,userMarker=null,watchId=null,trip=null,roads=[],roadById=new Map(),lastFix=null,fixCount=0;
+function loadDB(){try{return JSON.parse(localStorage.getItem(STORE))||structuredClone(defaultDB)}catch{return structuredClone(defaultDB)}}
+function saveDB(){localStorage.setItem(STORE,JSON.stringify(db))}
+function toast(s){$("toast").textContent=s;$("toast").style.display="block";setTimeout(()=>$("toast").style.display="none",2800)}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function cityData(){return city?db.cities[city.key]:null}
+function discoveries(){return cityData()?.discoveries||{}}
+function showCityScreen(){stopTrip(true);$("cityScreen").classList.remove("hidden");$("appScreen").classList.add("hidden");renderCityList()}
+function renderCityList(){const entries=Object.values(db.cities);$("cityList").innerHTML=entries.length?entries.map(c=>`<div class="listitem row"><div class="grow"><strong>${esc(c.name)}</strong><div class="small">${Object.keys(c.discoveries||{}).length} entdeckte Abschnitte</div></div><button onclick="openCity('${c.key}')">Öffnen</button></div>`).join(""):'<p class="muted">Noch keine Stadt gespeichert.</p>'}
+function cityKey(c){return c.osm_type+"-"+c.osm_id}
+async function searchCity(){let q=$("citySearch").value.trim();if(!q)return toast("Bitte gib einen Stadtnamen ein.");$("cityResults").textContent="Suche Stadtgrenze …";try{let url="https://nominatim.openstreetmap.org/search?format=jsonv2&polygon_geojson=1&addressdetails=1&q="+encodeURIComponent(q);let r=await fetch(url,{headers:{"Accept-Language":"de"}});if(!r.ok)throw Error();let data=await r.json();let choices=data.filter(x=>x.osm_type==="relation"&&x.geojson&&(x.geojson.type==="Polygon"||x.geojson.type==="MultiPolygon")&&(x.class==="boundary"||x.type==="administrative"||x.type==="city"||x.type==="town"||x.type==="municipality")).slice(0,8);if(!choices.length)choices=data.filter(x=>x.osm_type==="relation"&&x.geojson&&(x.geojson.type==="Polygon"||x.geojson.type==="MultiPolygon")).slice(0,5);if(!choices.length){$("cityResults").textContent="Keine passende Stadtgrenze gefunden. Versuche einen genaueren Namen, z. B. „Wuppertal, Deutschland“.";return}$("cityResults").innerHTML=choices.map((x,i)=>`<div class="listitem row"><div class="grow"><strong>${esc(x.name)}</strong><div class="small">${esc(x.type||x.class||"Gebiet")}</div></div><button onclick="chooseCity(${i})">Hinzufügen</button></div>`).join("");window.cityChoices=choices}catch(e){$("cityResults").textContent="Die Stadtsuche ist gerade nicht erreichbar. Bitte prüfe deine Internetverbindung und versuche es erneut."}}
+function chooseCity(i){let x=window.cityChoices[i],key=cityKey(x);db.cities[key]??={key,name:x.name.split(",")[0],osm_type:x.osm_type,osm_id:x.osm_id,geojson:x.geojson,bounds:x.boundingbox.map(Number),discoveries:{},trips:[],roads:[]};db.currentCity=key;saveDB();openCity(key)}
+function openCity(key){city=db.cities[key];if(!city)return;db.currentCity=key;saveDB();$("cityScreen").classList.add("hidden");$("appScreen").classList.remove("hidden");$("cityTitle").textContent=city.name;$("citySubtitle").textContent="Deine persönliche Entdeckerkarte";renderPeople();renderStats();initMap();loadRoads()}
+function renderPeople(){let opts=db.people.map(p=>`<option value="${p.id}">${p.avatar} ${esc(p.name)}</option>`).join("");$("tripPerson").innerHTML=opts;$("peopleList").innerHTML=db.people.map(p=>`<div class="person"><div class="avatar" style="border:2px solid ${p.color}">${p.avatar}</div><div class="meta"><strong>${esc(p.name)}</strong><small><i class="colorDot" style="background:${p.color}"></i>${p.color.toUpperCase()}</small></div><button class="ghost" onclick="editPerson('${p.id}')">Bearbeiten</button><button class="danger" onclick="deletePerson('${p.id}')">×</button></div>`).join("")}
+function addPerson(){let name=$("newPersonName").value.trim();if(!name)return toast("Bitte einen Namen eingeben.");let color=$("newPersonColor").value,avatar=$("newPersonAvatar").value;db.people.push({id:"p_"+Date.now(),name,avatar,color});saveDB();$("newPersonName").value="";renderPeople();toast("Person angelegt.")}
+function editPerson(id){let p=db.people.find(x=>x.id===id);if(!p)return;let name=prompt("Name der Person:",p.name);if(name===null)return;if(!name.trim())return toast("Der Name darf nicht leer sein.");let avatar=prompt("Charakter-Emoji auswählen (z. B. 🧭 🧑‍🚒 🧑‍✈️ 🐼):",p.avatar);if(avatar===null)return;let color=prompt("Farbcode eingeben (z. B. #ff62bd):",p.color);if(color===null)return;if(!/^#[0-9a-f]{6}$/i.test(color))return toast("Bitte einen gültigen Farbcode wie #ff62bd eingeben.");p.name=name.trim();p.avatar=avatar.trim()||"🙂";p.color=color;saveDB();renderPeople();renderStats();drawRoads()}
+function deletePerson(id){if(db.people.length<2)return toast("Mindestens eine Person muss vorhanden sein.");let used=Object.values(db.cities).some(c=>Object.values(c.discoveries||{}).some(d=>d.personId===id));if(used)return toast("Diese Person hat bereits Straßen entdeckt und kann deshalb nicht gelöscht werden.");if(!confirm("Person wirklich löschen?"))return;db.people=db.people.filter(p=>p.id!==id);saveDB();renderPeople()}
+$("addPerson").onclick=addPerson;
+function initMap(){if(map){map.remove();map=null}map=L.map("map",{zoomControl:true});L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; OpenStreetMap-Mitwirkende'}).addTo(map);let b=city.geojson.coordinates;let layer=L.geoJSON(city.geojson);map.fitBounds(layer.getBounds());maskLayer=null;try{let rings=[];if(city.geojson.type==="Polygon")rings=city.geojson.coordinates;else city.geojson.coordinates.forEach(poly=>rings.push(...poly));let world=[[-90,-180],[-90,180],[90,180],[90,-180]];maskLayer=L.polygon([world,...rings],{color:"transparent",weight:0,fillColor:"#101522",fillOpacity:.48,fillRule:"evenodd",interactive:false}).addTo(map);L.geoJSON(city.geojson,{style:{color:"#36b98b",weight:3,fillOpacity:0,interactive:false}}).addTo(map)}catch(e){}roadLayer=L.layerGroup().addTo(map)}
+async function loadRoads(){if(!city)return;roads=[];roadById.clear();$("tripStatus").textContent="Lade Straßenabschnitte für "+city.name+" …";let query=`[out:json][timeout:90];rel(${city.osm_id});map_to_area->.a;way(area.a)["highway"]["highway"!~"footway|path|cycleway|steps|track|construction|proposed|bridleway|pedestrian"];out geom;`;try{let r=await fetch("https://overpass-api.de/api/interpreter",{method:"POST",body:query});if(!r.ok)throw Error();let data=await r.json();for(let el of data.elements||[]){if(!el.geometry||el.geometry.length<2)continue;for(let i=0;i<el.geometry.length-1;i++){let a=el.geometry[i],b=el.geometry[i+1],id=`${el.id}-${i}`;let item={id,wayId:el.id,name:el.tags?.name||"Unbenannte Straße",highway:el.tags?.highway||"",a:[a.lat,a.lon],b:[b.lat,b.lon]};roads.push(item);roadById.set(id,item)}}city.roads=roads.map(x=>({id:x.id,name:x.name,highway:x.highway,a:x.a,b:x.b}));saveDB();drawRoads();renderStats();$("tripStatus").textContent=`${roads.length.toLocaleString("de-DE")} Straßenabschnitte geladen. Starte eine Tour, um Entdeckungen zu sammeln.`}catch(e){$("tripStatus").textContent="Straßendaten konnten nicht geladen werden. Overpass kann ausgelastet sein. Bitte später erneut versuchen.";toast("Fehler beim Laden der Straßen.")}}
+function getPerson(id){return db.people.find(p=>p.id===id)||db.people[0]}
+function drawRoads(){if(!roadLayer)return;roadLayer.clearLayers();let found=discoveries();for(let road of roads){let d=found[road.id],p=d?getPerson(d.personId):null;let line=L.polyline([road.a,road.b],{color:p?p.color:"#687487",weight:d?5:2,opacity:d?.95:.65}).addTo(roadLayer);line.bindTooltip(esc(road.name));line.on("click",()=>{if(trip)markRoad(road.id,true);else toast(road.name+(d?" · bereits entdeckt":" · Starte eine Tour, um den Abschnitt zu markieren."))})}}
+function renderStats(){if(!city)return;let found=Object.keys(discoveries()).length,total=roads.length||city.roads?.length||0,pct=total?Math.min(100,found/total*100):0;$("statPercent").textContent=pct.toFixed(1).replace(".",",")+"%";$("statRoads").textContent=found.toLocaleString("de-DE")+" / "+total.toLocaleString("de-DE");let trips=city.trips||[];$("statTrips").textContent=trips.length;let km=trips.reduce((s,t)=>s+(t.km||0),0);$("statKm").textContent=km.toFixed(1).replace(".",",")+" km";renderRanking();renderHistory()}
+function renderRanking(){if(!$("ranking"))return;let found=discoveries(),arr=db.people.map(p=>({p,n:Object.values(found).filter(d=>d.personId===p.id).length,km:(city.trips||[]).filter(t=>t.personId===p.id).reduce((s,t)=>s+(t.km||0),0)})).sort((a,b)=>b.n-a.n);$("ranking").innerHTML=arr.map((x,i)=>`<div class="person"><div class="avatar" style="border:2px solid ${x.p.color}">${["🥇","🥈","🥉"][i]||"🏅"}</div><div class="meta"><strong>${x.p.avatar} ${esc(x.p.name)}</strong><small>${x.n} Abschnitte · ${x.km.toFixed(1)} km</small></div><strong>${x.n}</strong></div>`).join("")}
+function renderHistory(){let trips=(city?.trips||[]).slice().reverse();$("history").innerHTML=trips.length?trips.map(t=>{let p=getPerson(t.personId);return `<div class="listitem row"><div class="avatar" style="border:2px solid ${p.color}">${p.avatar}</div><div class="grow"><strong>${esc(p.name)} · ${new Date(t.start).toLocaleDateString("de-DE")}</strong><div class="small">${new Date(t.start).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} · ${Math.round(t.duration/60000)} Min. · ${t.newRoads} neue Abschnitte · ${(t.km||0).toFixed(1)} km</div></div></div>`}).join(""):'<p class="muted">Noch keine Touren gespeichert.</p>'}
+function startTrip(){if(!roads.length)return toast("Bitte warte, bis die Straßen geladen sind.");if(!navigator.geolocation)return toast("GPS wird von diesem Gerät nicht unterstützt.");if(!window.isSecureContext)return toast("GPS benötigt eine HTTPS-Adresse.");let p=getPerson($("tripPerson").value);trip={id:"t_"+Date.now(),personId:p.id,start:Date.now(),duration:0,newRoads:0,km:0,lastPoint:null,seen:new Set()};$("startTrip").classList.add("hidden");$("stopTrip").classList.remove("hidden");$("tripStatus").textContent="Tour läuft · "+p.name+" · GPS aktiv";fixCount=0;watchId=navigator.geolocation.watchPosition(onPosition,err=>toast("GPS-Fehler: "+err.message),{enableHighAccuracy:true,maximumAge:1000,timeout:15000})}
+function stopTrip(silent=false){if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null}if(trip){trip.duration=Date.now()-trip.start;let t={...trip,seen:undefined};if(t.newRoads>0||t.km>0){city.trips??=[];city.trips.push(t);saveDB()}trip=null;renderStats()}$("startTrip").classList.remove("hidden");$("stopTrip").classList.add("hidden");if(!silent&&city)$("tripStatus").textContent="Tour beendet. Deine Entdeckungen wurden gespeichert."}
+function onPosition(pos){if(!trip)return;let {latitude:lat,longitude:lon,accuracy}=pos.coords;if(accuracy>35){$("tripStatus").textContent=`GPS noch ungenau (${Math.round(accuracy)} m). Suche besseren Empfang …`;return}fixCount++;if(userMarker)userMarker.setLatLng([lat,lon]);else userMarker=L.circleMarker([lat,lon],{radius:7,color:"#fff",weight:2,fillColor:"#2588ff",fillOpacity:1}).addTo(map);if(!map.getBounds().pad(-.2).contains([lat,lon]))map.panTo([lat,lon]);if(!insideCity(lat,lon)){ $("tripStatus").textContent="Du befindest dich außerhalb der Stadtgrenze. Hier werden keine Straßen markiert.";trip.lastPoint=null;return}
+ if(trip.lastPoint){let d=distance(trip.lastPoint.lat,trip.lastPoint.lon,lat,lon);if(d<100&&d>1)trip.km+=d/1000}trip.lastPoint={lat,lon};if(fixCount%2===0)detectNearest(lat,lon);$("tripStatus").textContent=`Tour läuft · ${getPerson(trip.personId).name} · GPS ±${Math.round(accuracy)} m · ${trip.newRoads} neue Abschnitte`}
+function insideCity(lat,lon){let g=city.geojson;let polys=g.type==="Polygon"?[g.coordinates]:g.coordinates;return polys.some(poly=>pointInRing(lon,lat,poly[0])&&!poly.slice(1).some(r=>pointInRing(lon,lat,r)))}
+function pointInRing(x,y,ring){let inside=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){let xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1],inter=((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi);if(inter)inside=!inside}return inside}
+function detectNearest(lat,lon){let best=null,bestD=Infinity;for(let r of roads){if(discoveries()[r.id]||trip.seen.has(r.id))continue;let d=pointSegmentDistance(lat,lon,r.a[0],r.a[1],r.b[0],r.b[1]);if(d<bestD){bestD=d;best=r}}if(best&&bestD<13){let key=best.id;trip.seen.add(key);markRoad(key,false)}}
+function pointSegmentDistance(lat,lon,alat,alon,blat,blon){let m=111320,cos=Math.cos(lat*Math.PI/180),px=(lon-alon)*m*cos,py=(lat-alat)*m,bx=(blon-alon)*m*cos,by=(blat-alat)*m,den=bx*bx+by*by,t=den?Math.max(0,Math.min(1,(px*bx+py*by)/den)):0;return Math.hypot(px-t*bx,py-t*by)}
+function markRoad(id,manual){if(!trip)return;let found=discoveries();if(found[id])return;if(manual)trip.seen.add(id);found[id]={personId:trip.personId,tripId:trip.id,discoveredAt:Date.now()};trip.newRoads++;saveDB();let r=roadById.get(id);if(r){let p=getPerson(trip.personId);L.polyline([r.a,r.b],{color:p.color,weight:5,opacity:.95}).addTo(roadLayer)}renderStats()}
+function distance(a,b,c,d){let R=6371000,x=(d-b)*Math.PI/180*Math.cos((a+c)/2*Math.PI/180),y=(c-a)*Math.PI/180;return Math.sqrt(x*x+y*y)*R}
+function locate(){if(!navigator.geolocation)return; navigator.geolocation.getCurrentPosition(p=>{let ll=[p.coords.latitude,p.coords.longitude];if(userMarker)userMarker.setLatLng(ll);else userMarker=L.circleMarker(ll,{radius:7,color:"#fff",weight:2,fillColor:"#2588ff",fillOpacity:1}).addTo(map);map.setView(ll,16)},e=>toast("Standort nicht verfügbar: "+e.message),{enableHighAccuracy:true,timeout:12000})}
+function findRoad(){let q=$("roadSearch").value.toLowerCase().trim();if(!q)return;let matches=roads.filter(r=>r.name.toLowerCase().includes(q)).slice(0,12);$("roadResults").innerHTML=matches.length?matches.map(r=>`<div class="listitem row"><span class="grow">${esc(r.name)}</span><button onclick="map.setView([${r.a[0]},${r.a[1]}],17)">Anzeigen</button></div>`).join(""):'<p class="small">Keine passende Straße gefunden.</p>'}
+function exportData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="wuppitall-sicherung-"+new Date().toISOString().slice(0,10)+".json";a.click();URL.revokeObjectURL(url);toast("Sicherung exportiert.")}
+function importData(file){let reader=new FileReader();reader.onload=()=>{try{let incoming=JSON.parse(reader.result);if(!incoming.people||!incoming.cities)throw Error();if(!confirm("Import ersetzt deine aktuellen Wuppitall-Daten. Fortfahren?"))return;db=incoming;saveDB();toast("Spielstand importiert.");showCityScreen()}catch(e){toast("Datei ist keine gültige Wuppitall-Sicherung.")}};reader.readAsText(file)}
+$("searchCity").onclick=searchCity;$("citySearch").addEventListener("keydown",e=>{if(e.key==="Enter")searchCity()});$("homeBtn").onclick=showCityScreen;$("changeCity").onclick=showCityScreen;$("startTrip").onclick=startTrip;$("stopTrip").onclick=()=>stopTrip(false);$("locateBtn").onclick=locate;$("reloadRoads").onclick=loadRoads;$("findRoad").onclick=findRoad;$("exportBtn").onclick=exportData;$("exportBtn2").onclick=exportData;$("importBtn").onclick=$("importBtn2").onclick=()=>$("importFile").click();$("importFile").onchange=e=>{if(e.target.files[0])importData(e.target.files[0]);e.target.value=""};
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{document.querySelectorAll(".tabs button").forEach(x=>x.classList.remove("active"));b.classList.add("active");["mapTab","peopleTab","statsTab","historyTab","settingsTab"].forEach(id=>$(id).classList.toggle("hidden",id!==b.dataset.tab));if(b.dataset.tab==="mapTab"&&map)setTimeout(()=>map.invalidateSize(),100);renderStats()});
+document.addEventListener("visibilitychange",()=>{if(document.hidden&&trip)stopTrip(true)});window.addEventListener("pagehide",()=>{if(trip)stopTrip(true)});
+if("serviceWorker" in navigator&&location.protocol.startsWith("http"))window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+if(db.currentCity&&db.cities[db.currentCity])openCity(db.currentCity);else showCityScreen();
+</script>
+</body></html>
